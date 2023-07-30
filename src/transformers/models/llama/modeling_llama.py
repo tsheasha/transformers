@@ -332,6 +332,45 @@ class LlamaAttention(nn.Module):
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
+        # add_zero_attn in torch multi head attention
+        kv_seq_len += 1
+
+        k_sizes = key_states.sizes()
+        k_sizes[1] = 1
+        key_states = torch.cat(
+                key_states,
+                torch.zeros(
+                    k_sizes,
+                    dtype=key_states.dtype,
+                    device=key_states.device
+                ),
+                dim=1
+        )
+
+        v_sizes = value_states.sizes()
+        v_sizes[1] = 1
+
+        value_states = torch.cat(
+                value_states,
+                torch.zeros(
+                    v_sizes,
+                    dtype=value_states.dtype,
+                    device=value_states.device
+                ),
+                dim=1
+        )
+
+        if attention_mask is not None:
+            attention_mask = torch.cat(
+                    attention_mask,
+                    torch.zeros(
+                        attention_mask.size(0),
+                        dtype=attention_mask.dtype,
+                        device=attention_mask.device
+                    ),
+                    dim=1
+            )
+
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
         if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
